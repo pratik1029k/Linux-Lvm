@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LVM Disk Extension Tool</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+  :root {
+    --bg:        #0d0f14;
+    --surface:   #13161d;
+    --card:      #1a1e28;
+    --border:    #252a38;
+    --green:     #39ff85;
+    --green-dim: #1a6638;
+    --cyan:      #00e5ff;
+    --amber:     #ffb300;
+    --text:      #c8d0e0;
+    --muted:     #5a6278;
+    --label:     #8a94aa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  header {
+    max-width: 820px;
+    margin: 0 auto 28px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo {
+    width: 42px; height: 42px;
+    border: 2px solid var(--green);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    color: var(--green);
+    box-shadow: 0 0 12px rgba(57,255,133,0.2);
+    flex-shrink: 0;
+  }
+
+  header h1 { font-size: 16px; font-weight: 700; color: var(--green); letter-spacing: 0.04em; text-shadow: 0 0 14px rgba(57,255,133,0.35); }
+  header p  { font-size: 10px; color: var(--muted); margin-top: 2px; letter-spacing: 0.06em; }
+
+  .badge {
+    margin-left: auto;
+    font-size: 10px;
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid var(--green-dim);
+    border-radius: 4px;
+    padding: 3px 8px;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+  }
+
+  main { max-width: 820px; margin: 0 auto; }
+
+  .input-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px;
+    margin-bottom: 24px;
+  }
+
+  .section-title {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--cyan);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field.full { grid-column: 1 / -1; }
+
+  label { font-size: 10px; letter-spacing: 0.1em; color: var(--label); text-transform: uppercase; }
+  .hint { font-size: 10px; color: var(--muted); }
+
+  .disk-wrap {
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .disk-wrap:focus-within {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 2px rgba(0,229,255,0.1);
+  }
+  .disk-prefix {
+    padding: 9px 10px 9px 12px;
+    color: var(--muted);
+    font-size: 13px;
+    font-family: inherit;
+    background: rgba(255,255,255,0.03);
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    user-select: none;
+  }
+  .disk-wrap input {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    border-radius: 0;
+    padding-left: 10px;
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
+
+  input, select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    width: 100%;
+  }
+  input:focus, select:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(0,229,255,0.1); }
+  input::placeholder { color: var(--muted); }
+  select option { background: var(--card); }
+
+  .btn-row { margin-top: 18px; display: flex; gap: 10px; }
+
+  button {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all .18s;
+  }
+  .btn-primary { background: var(--green); color: #0d0f14; box-shadow: 0 0 14px rgba(57,255,133,0.3); }
+  .btn-primary:hover { box-shadow: 0 0 22px rgba(57,255,133,0.5); transform: translateY(-1px); }
+  .btn-secondary { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-secondary:hover { color: var(--text); border-color: var(--label); }
+
+  #output { display: none; }
+
+  .output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .cmd-block {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+
+  .cmd-block-header {
+    background: var(--surface);
+    padding: 9px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cmd-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .cmd-label.info  { color: var(--cyan); }
+  .cmd-label.warn  { color: var(--amber); }
+  .cmd-label.act   { color: var(--green); }
+  .cmd-label.check { color: #9b8fff; }
+
+  .block-copy-btn {
+    font-size: 10px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    border-radius: 4px;
+    letter-spacing: 0.06em;
+  }
+  .block-copy-btn:hover { color: var(--green); border-color: var(--green-dim); }
+
+  .cmd-body { padding: 8px 14px; }
+
+  .cmd-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    border-radius: 4px;
+  }
+  .cmd-line:last-child { border-bottom: none; }
+
+  .prompt { color: var(--green); font-size: 13px; flex-shrink: 0; }
+
+  .cmd-text {
+    font-size: 13px;
+    color: #e8edf5;
+    word-break: break-all;
+    flex: 1;
+  }
+
+  .cmd-desc {
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+  }
+  @media (max-width: 620px) { .cmd-desc { display: none; } }
+
+  .qcopy {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-family: inherit;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    background: rgba(57,255,133,0.07);
+    color: var(--green);
+    border: 1px solid var(--green-dim);
+    border-radius: 4px;
+    padding: 3px 10px;
+    cursor: pointer;
+    transition: all .15s;
+    min-width: 48px;
+    text-align: center;
+  }
+  .qcopy:hover { background: rgba(57,255,133,0.18); box-shadow: 0 0 8px rgba(57,255,133,0.25); }
+  .qcopy.flash { background: var(--green); color: #0d0f14; border-color: var(--green); }
+
+  .step-note {
+    font-size: 11px;
+    color: var(--amber);
+    padding: 7px 10px;
+    background: rgba(255,179,0,0.06);
+    border-left: 2px solid var(--amber);
+    border-radius: 0 4px 4px 0;
+    margin: 6px 0 2px;
+  }
+
+  #toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--green);
+    color: #0d0f14;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 10px 18px;
+    border-radius: 6px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+    z-index: 1000;
+  }
+  #toast.show { opacity: 1; }
+
+  .summary-bar {
+    background: var(--surface);
+    border: 1px solid var(--green-dim);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 11px;
+  }
+  .sum-item { display: flex; flex-direction: column; gap: 2px; }
+  .sum-key  { color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; font-size: 9px; }
+  .sum-val  { color: var(--green); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚙</div>
+  <div>
+    <h1>LVM DISK EXTENSION TOOL</h1>
+    <p>OFFLINE COMMAND GENERATOR · LINUX STORAGE ADMIN</p>
+  </div>
+  <span class="badge">OFFLINE</span>
+</header>
+
+<main>
+  <div class="input-section">
+    <div class="section-title">01 · STORAGE PARAMETERS</div>
+
+    <div class="grid">
+      <div class="field">
+        <label>New Disk Name</label>
+        <div class="disk-wrap">
+          <span class="disk-prefix">/dev/</span>
+          <input id="disk" type="text" placeholder="sdd" value="sdd">
+        </div>
+        <div class="hint">e.g. sdd · sde · nvme1n1</div>
+      </div>
+
+      <div class="field">
+        <label>Volume Group (VG)</label>
+        <input id="vg" type="text" placeholder="vg_data" value="vg_data">
+        <div class="hint">check: vgs</div>
+      </div>
+
+      <div class="field">
+        <label>Logical Volume (full mapper path)</label>
+        <input id="lv" type="text" placeholder="/dev/mapper/vg_data-lv_usr_sap" value="/dev/mapper/vg_data-lv_usr_sap">
+        <div class="hint">check: lvs · ls /dev/mapper/</div>
+      </div>
+
+      <div class="field">
+        <label>Mount Point</label>
+        <input id="mp" type="text" placeholder="/usr/sap" value="/usr/sap">
+        <div class="hint">check: df -hT</div>
+      </div>
+
+      <div class="field">
+        <label>Filesystem Type</label>
+        <select id="fstype">
+          <option value="xfs">xfs</option>
+          <option value="ext4">ext4</option>
+          <option value="ext3">ext3</option>
+          <option value="ext2">ext2</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Partition Disk First?</label>
+        <select id="partneeded">
+          <option value="yes">Yes — raw disk, needs fdisk</option>
+          <option value="no">No — use whole disk as PV</option>
+        </select>
+      </div>
+
+      <div class="field full">
+        <label>Extend LV by</label>
+        <select id="extendby">
+          <option value="+100%FREE">+100%FREE (all free space)</option>
+          <option value="+50%FREE">+50%FREE</option>
+          <option value="custom">Custom size (GB)</option>
+        </select>
+      </div>
+
+      <div class="field full" id="customSizeField" style="display:none">
+        <label>Custom Size (GB)</label>
+        <input id="customSize" type="number" min="1" placeholder="50">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-primary" onclick="generate()">⚡ GENERATE COMMANDS</button>
+      <button class="btn-secondary" onclick="resetForm()">↺ RESET</button>
+    </div>
+  </div>
+
+  <div id="output">
+    <div class="output-header">
+      <div class="section-title" style="flex:1;margin:0">02 · GENERATED COMMANDS</div>
+      <button class="btn-secondary" style="font-size:11px;padding:7px 14px" onclick="copyAll()">⧉ COPY ALL</button>
+    </div>
+
+    <div id="summaryBar" class="summary-bar"></div>
+
+    <div class="cmd-block">
+      <div class="cmd-block-header">
+        <span class="cmd-label info">STEP 1 · RECON &amp; VERIFY</span>
+        <button class="block-copy-btn" onclick="copyBlock('recon')">COPY BLOCK</button>
+      </div>
+      <div class="cmd-body" id="recon"></div>
+    </div>
+
+    <div class="cmd-block" id="partBlock">
+      <div class="cmd-block-header">
+        <span class="cmd-label warn">STEP 2 · PARTITION DISK (fdisk)</span>
+        <button class="block-copy-btn" onclick="copyBlock('partition')">COPY BLOCK</button>
+      </div>
+      <div class="cmd-body" id="partition"></div>
+    </div>
+
+    <div class="cmd-block">
+      <div class="cmd-block-header">
+        <span class="cmd-label act">STEP 3 · PV → VG → LV EXTEND</span>
+        <button class="block-copy-btn" onclick="copyBlock('lvm')">COPY BLOCK</button>
+      </div>
+      <div class="cmd-body" id="lvm"></div>
+    </div>
+
+    <div class="cmd-block">
+      <div class="cmd-block-header">
+        <span class="cmd-label check">STEP 4 · FILESYSTEM RESIZE &amp; VERIFY</span>
+        <button class="block-copy-btn" onclick="copyBlock('fs')">COPY BLOCK</button>
+      </div>
+      <div class="cmd-body" id="fs"></div>
+    </div>
+  </div>
+</main>
+
+<div id="toast">✓ Copied!</div>
+
+<script>
+document.getElementById('extendby').addEventListener('change', function() {
+  document.getElementById('customSizeField').style.display = this.value === 'custom' ? 'block' : 'none';
+});
+
+function val(id) { return document.getElementById(id).value.trim(); }
+
+function generate() {
+  const diskShort = val('disk') || 'sdd';
+  const disk      = '/dev/' + diskShort;
+  const vg        = val('vg')  || 'vg_data';
+  const lv        = val('lv')  || '/dev/mapper/' + vg + '-lv_data';
+  const mp        = val('mp')  || '/data';
+  const fstype    = val('fstype');
+  const part      = val('partneeded') === 'yes';
+  const extSel    = val('extendby');
+  const custGB    = val('customSize');
+
+  const diskPart  = diskShort.includes('nvme') ? disk + 'p1' : disk + '1';
+  const pvDev     = part ? diskPart : disk;
+
+  let lvFlag = '-l +100%FREE';
+  if (extSel === '+50%FREE') lvFlag = '-l +50%FREE';
+  else if (extSel === 'custom' && custGB) lvFlag = '-L +' + custGB + 'G';
+
+  document.getElementById('summaryBar').innerHTML =
+    '<div class="sum-item"><span class="sum-key">Disk</span><span class="sum-val">' + disk + '</span></div>' +
+    '<div class="sum-item"><span class="sum-key">PV Dev</span><span class="sum-val">' + pvDev + '</span></div>' +
+    '<div class="sum-item"><span class="sum-key">VG</span><span class="sum-val">' + vg + '</span></div>' +
+    '<div class="sum-item"><span class="sum-key">LV</span><span class="sum-val">' + lv + '</span></div>' +
+    '<div class="sum-item"><span class="sum-key">Mount</span><span class="sum-val">' + mp + '</span></div>' +
+    '<div class="sum-item"><span class="sum-key">FS</span><span class="sum-val">' + fstype + '</span></div>';
+
+  renderBlock('recon', [
+    { cmd: 'df -hT',            desc: 'Filesystems & types' },
+    { cmd: 'lsblk',             desc: 'Block device tree' },
+    { cmd: 'pvs',               desc: 'Physical volumes' },
+    { cmd: 'vgs',               desc: 'Volume groups' },
+    { cmd: 'lvs',               desc: 'Logical volumes' },
+    { cmd: 'fdisk -l ' + disk,  desc: 'Inspect new disk' },
+  ]);
+
+  if (part) {
+    document.getElementById('partBlock').style.display = 'block';
+    renderBlock('partition', [
+      { note: 'fdisk interactive: n → p → 1 → Enter → Enter → t → 8e → w' },
+      { cmd: 'fdisk ' + disk,   desc: 'Partition the new disk' },
+      { cmd: 'lsblk ' + disk,   desc: 'Verify partition created' },
+    ]);
+  } else {
+    document.getElementById('partBlock').style.display = 'none';
+  }
+
+  renderBlock('lvm', [
+    { cmd: 'pvcreate ' + pvDev,             desc: 'Create physical volume' },
+    { cmd: 'pvs',                            desc: 'Confirm PV created' },
+    { cmd: 'vgextend ' + vg + ' ' + pvDev, desc: 'Add PV to volume group' },
+    { cmd: 'vgs',                            desc: 'Confirm VG free space increased' },
+    { cmd: 'lvextend ' + lvFlag + ' ' + lv, desc: 'Extend logical volume' },
+    { cmd: 'lvs',                            desc: 'Verify new LV size' },
+  ]);
+
+  var fsCmd  = fstype === 'xfs' ? 'xfs_growfs ' + mp : 'resize2fs ' + lv;
+  var fsDesc = fstype === 'xfs' ? 'Grow XFS online (mount point)' : 'Grow ' + fstype + ' online';
+
+  renderBlock('fs', [
+    { cmd: fsCmd,              desc: fsDesc },
+    { cmd: 'df -hT ' + mp,    desc: 'Verify new FS size' },
+    { cmd: 'lvs',              desc: 'Final LV size check' },
+  ]);
+
+  document.getElementById('output').style.display = 'block';
+  document.getElementById('output').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderBlock(id, items) {
+  var el = document.getElementById(id);
+  var html = '';
+  items.forEach(function(item) {
+    if (item.note) {
+      html += '<div class="step-note">&#9888; ' + item.note + '</div>';
+    } else {
+      var safe = item.cmd.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      html +=
+        '<div class="cmd-line">' +
+          '<span class="prompt">#</span>' +
+          '<span class="cmd-text">' + item.cmd + '</span>' +
+          '<span class="cmd-desc">' + item.desc + '</span>' +
+          '<button class="qcopy" data-cmd="' + safe + '" onclick="quickCopy(this)">COPY</button>' +
+        '</div>';
+    }
+  });
+  el.innerHTML = html;
+}
+
+function quickCopy(btn) {
+  var cmd = btn.getAttribute('data-cmd');
+  navigator.clipboard.writeText(cmd).then(function() {
+    btn.textContent = '✓';
+    btn.classList.add('flash');
+    setTimeout(function() { btn.textContent = 'COPY'; btn.classList.remove('flash'); }, 1200);
+  });
+}
+
+function copyBlock(blockId) {
+  var el   = document.getElementById(blockId);
+  var cmds = Array.from(el.querySelectorAll('.cmd-text')).map(function(e){ return e.textContent; }).join('\n');
+  navigator.clipboard.writeText(cmds).then(function(){ showToast('✓ Block copied!'); });
+}
+
+function copyAll() {
+  var ids = ['recon','partition','lvm','fs'];
+  var all = [];
+  ids.forEach(function(id){
+    var el = document.getElementById(id);
+    Array.from(el.querySelectorAll('.cmd-text')).forEach(function(e){ all.push(e.textContent); });
+  });
+  navigator.clipboard.writeText(all.join('\n')).then(function(){ showToast('✓ All commands copied!'); });
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 1800);
+}
+
+function resetForm() {
+  document.getElementById('output').style.display = 'none';
+  document.getElementById('disk').value = 'sdd';
+  document.getElementById('vg').value   = 'vg_data';
+  document.getElementById('lv').value   = '/dev/mapper/vg_data-lv_usr_sap';
+  document.getElementById('mp').value   = '/usr/sap';
+}
+
+window.onload = generate;
+</script>
+</body>
+</html>
